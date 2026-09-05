@@ -1,12 +1,19 @@
-name: Build
+name: Deploy
 on:
   push:
     branches: [ master ]
+
+# The gh-pages deployment pushes a branch, so contents: write is required. It is
+# declared here so the token carries nothing beyond that -- notably not
+# packages, actions or id-token access.
+permissions:
+  contents: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout	
+      - name: Checkout
         uses: actions/checkout@v4.2.2
         with:
           submodules: recursive
@@ -20,13 +27,13 @@ jobs:
       - name: Run yarn install
         uses: borales/actions-yarn@v4
         with:
-         dir: 'website'
-         cmd: install # will run `yarn install` command
+          dir: 'website'
+          cmd: install # will run `yarn install` command
       - name: Run yarn build
         uses: borales/actions-yarn@v4
         with:
           dir: 'website'
-          cmd: run build # will run `yarn test` command     
+          cmd: run build # will run `yarn build` command
       - name: Merge
         run: |
           cp -a output/. website/public/

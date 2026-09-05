@@ -1,6 +1,12 @@
 on:
   pull_request_target:
     types: [closed]
+
+# Same reasoning as pr_intro_comment.yml: a `pull_request_target` job runs with
+# base-repository privileges, and this one only needs to leave a comment.
+permissions:
+  pull-requests: write
+
 jobs:
   comment_on_merged_pr:
     if: github.event.pull_request.merged

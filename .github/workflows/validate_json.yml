@@ -5,6 +5,10 @@ on:
   pull_request:
   merge_group:
 
+# This workflow only needs to read the checked-out tree.
+permissions:
+  contents: read
+
 jobs:
   validate_json:
     runs-on: ubuntu-latest
@@ -15,11 +19,20 @@ jobs:
       name: Configure npm caching
       with:
         path: ~/.npm
-        key: ${{ runner.os }}-npm-${{ hashFiles('**/workflows/validate_json.yml') }}
+        # Keyed on the lockfile that actually determines what npm downloads. The
+        # previous key hashed the workflow file, so editing dependencies in
+        # tools/package.json never invalidated the cache, while editing an
+        # unrelated line in this workflow discarded a still-valid one.
+        key: ${{ runner.os }}-npm-${{ hashFiles('tools/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-npm-
     - name: Run JSON Validation
       working-directory: ./tools
+      # `npm ci` instead of `npm install`: tools/package-lock.json is committed,
+      # and ci installs exactly what it pins. `npm install` is free to resolve
+      # newer versions inside the declared ranges and to rewrite the lockfile, so
+      # CI could validate against a different dependency tree than the one that
+      # was reviewed, and a bad upstream release would land without a diff.
       run: |-
-        npm install
+        npm ci
         node schemaCheck.js
