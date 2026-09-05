@@ -3,6 +3,13 @@ on:
   schedule:
     - cron: '30 1 * * *'
 
+# actions/stale needs to label and close issues and pull requests, and nothing
+# else. Declaring that explicitly keeps a scheduled job -- which always runs with
+# base-branch privileges -- from holding write access to repository contents.
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   stale:
     runs-on: ubuntu-latest

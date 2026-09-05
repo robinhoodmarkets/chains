@@ -5,6 +5,10 @@ on:
   pull_request:
   merge_group:
 
+# This workflow only needs to read the checked-out tree.
+permissions:
+  contents: read
+
 jobs:
   prettier:
     runs-on: ubuntu-latest
@@ -15,9 +19,20 @@ jobs:
         name: Configure npm caching
         with:
           path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/workflows/prettier.yml') }}
+          # Keyed on this workflow file, which is where the pinned Prettier
+          # version lives. The previous key hashed '**/workflows/prettier.yml' --
+          # a path that does not exist in this repository (the file is
+          # prettier_check.yml). hashFiles returns an empty string when nothing
+          # matches, so the key collapsed to a constant "<os>-npm-" that never
+          # changed and never invalidated the cache.
+          key: ${{ runner.os }}-npm-${{ hashFiles('.github/workflows/prettier_check.yml') }}
           restore-keys: |
             ${{ runner.os }}-npm-
       - name: Run prettier
+        # Pinned to the 3.x line rather than resolving whatever "latest" is at
+        # run time. An unpinned `npx prettier` silently adopts new major versions,
+        # and a formatting-default change in a new release turns every unrelated
+        # pull request red until someone reformats the whole _data tree. It also
+        # means the exact code fetched and executed in CI is not reproducible.
         run: |-
-          npx prettier --check '_data/*/*.json'
+          npx --yes prettier@3 --check '_data/*/*.json'

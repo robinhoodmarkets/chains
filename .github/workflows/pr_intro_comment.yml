@@ -1,6 +1,15 @@
 on:
   pull_request_target:
     types: [opened]
+
+# `pull_request_target` runs with a token that carries the base repository's
+# permissions even when the pull request comes from a fork. This job only posts a
+# comment, so it is scoped to exactly that: no contents, packages or actions
+# access. Without an explicit block the job silently inherits the repository
+# default, which is frequently write access to everything.
+permissions:
+  pull-requests: write
+
 jobs:
   comment_on_pr:
     runs-on: ubuntu-latest
